@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -9,7 +9,7 @@ class Task(Base):
     id = Column(Integer, primary_key = True, index = True)
     title = Column(String)
     status = Column(String)
-
+    user_id = Column(Integer, ForeignKey("users.id"))
 
 class DBUser(Base):
     __tablename__ = "users"

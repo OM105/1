@@ -61,21 +61,21 @@ def root():
     return "Server is Running."
 
 @app.get("/tasks", response_model = list[TaskResponse])
-def get_tasks(db:Session = Depends(get_db)):
-    tasks = db.query(models.Task).all()
+def get_tasks(current_user: Annotated[models.DBUser, Depends(get_current_active_user)], db:Session = Depends(get_db)):
+    tasks = db.query(models.Task).filter(models.Task.user_id == current_user.id).all()
     return tasks
 
 @app.post("/tasks", response_model=TaskResponse)
-def create_task1(task:TaskCreate, db:Session = Depends(get_db)):
-    new_task = models.Task(title=task.title, status=task.status)
+def create_task1(current_user: Annotated[models.DBUser, Depends(get_current_active_user)], task:TaskCreate, db:Session = Depends(get_db)):
+    new_task = models.Task(title=task.title, status=task.status, user_id = current_user.id)
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
     return new_task
 
 @app.get("/tasks/{task_id}", response_model = TaskResponse)
-def get_task(task_id:int, db:Session = Depends(get_db)):
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+def get_task(task_id:int, current_user: Annotated[models.DBUser, Depends(get_current_active_user)], db:Session = Depends(get_db)):
+    task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.user_id == current_user.id).first()
 
     if task is None:
         raise HTTPException(status_code = 404, detail = "Task Not Found")
@@ -83,8 +83,8 @@ def get_task(task_id:int, db:Session = Depends(get_db)):
     return task
 
 @app.delete("/tasks/{task_id}")
-def del_task(task_id:int, db:Session = Depends(get_db)):
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+def del_task(task_id:int, current_user: Annotated[models.DBUser, Depends(get_current_active_user)], db:Session = Depends(get_db)):
+    task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.user_id == current_user.id).first()
     
     if task is None:
          raise HTTPException(status_code = 404, detail = "Task Not Found")
@@ -94,8 +94,8 @@ def del_task(task_id:int, db:Session = Depends(get_db)):
         return {"message": "Task Deleted Successfully"}
     
 @app.put("/tasks/{task_id}", response_model=TaskResponse)
-def update_task(task_id:int, newdata:TaskCreate, db:Session = Depends(get_db)):
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+def update_task(task_id:int, newdata:TaskCreate, current_user: Annotated[models.DBUser, Depends(get_current_active_user)],  db:Session = Depends(get_db)):
+    task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.user_id == current_user.id).first()
     
     if task is None:
         raise HTTPException(status_code = 404, detail = "Task Not Found")
@@ -107,8 +107,8 @@ def update_task(task_id:int, newdata:TaskCreate, db:Session = Depends(get_db)):
     return task
 
 @app.get("/tasks/{task_id}/toggle", response_model = TaskResponse)
-def toggle(task_id:int, db:Session = Depends(get_db)):
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+def toggle(task_id:int, current_user: Annotated[models.DBUser, Depends(get_current_active_user)], db:Session = Depends(get_db)):
+    task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.user_id == current_user.id).first()
 
     if task is None:
         raise HTTPException(status_code = 404, detail = "Task Not Found")
@@ -122,8 +122,8 @@ def toggle(task_id:int, db:Session = Depends(get_db)):
     return task
 
 @app.put("/tasks/{task_id}/{new_name}/change_title", response_model = TaskResponse)
-def change_title(task_id: int, new_name: str, db:Session = Depends(get_db)):
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+def change_title(task_id: int, current_user: Annotated[models.DBUser, Depends(get_current_active_user)], new_name: str, db:Session = Depends(get_db)):
+    task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.user_id == current_user.id).first()
 
     if task is None:
         raise HTTPException(status_code = 404, detail = "Task Not Found")
