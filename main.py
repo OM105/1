@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from schema import TaskCreate, TaskResponse, UserRegister, UserResponse
+from schema import TaskCreate, TaskResponse, UserRegister, UserResponse, TaskStatus, Priority
 from database import get_db
 import models
 from typing import Annotated
@@ -22,7 +22,7 @@ async def read_own_items(
 async def read_users_me(
     current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> UserResponse:
-    return current_user
+    return current_user # type: ignore
 
 @app.post("/register", response_model = UserResponse)
 def register(user_data: UserRegister, db: Session = Depends(get_db)):
@@ -36,7 +36,6 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
         hashed_password = hash_pwd,
         disabled = False
     )
-
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -67,7 +66,7 @@ def get_tasks(current_user: Annotated[models.DBUser, Depends(get_current_active_
 
 @app.post("/tasks", response_model=TaskResponse)
 def create_task1(current_user: Annotated[models.DBUser, Depends(get_current_active_user)], task:TaskCreate, db:Session = Depends(get_db)):
-    new_task = models.Task(title=task.title, status=task.status, user_id = current_user.id)
+    new_task = models.Task(title=task.title, status=task.status, priority=task.priority, Description=task.Description, due_date=task.due_date, user_id = current_user.id)
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
@@ -100,23 +99,21 @@ def update_task(task_id:int, newdata:TaskCreate, current_user: Annotated[models.
     if task is None:
         raise HTTPException(status_code = 404, detail = "Task Not Found")
     
-    task.title = newdata.title
-    task.status = newdata.status
+    task.title = newdata.title # type: ignore
+    task.status = newdata.status # type: ignore
     db.commit()
     db.refresh(task)
     return task
 
-@app.get("/tasks/{task_id}/toggle", response_model = TaskResponse)
-def toggle(task_id:int, current_user: Annotated[models.DBUser, Depends(get_current_active_user)], db:Session = Depends(get_db)):
+@app.get("/tasks/{task_id}/{s_u}/toggle", response_model = TaskResponse)
+def toggle(task_id:int, s_u: str, current_user: Annotated[models.DBUser, Depends(get_current_active_user)], db:Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.user_id == current_user.id).first()
 
     if task is None:
         raise HTTPException(status_code = 404, detail = "Task Not Found")
 
-    if task.status == "pending":
-        task.status = "Done"
-    else:
-        task.status = "pending"
+    task.status = TaskStatus(s_u) # type: ignore
+
     
     db.commit()
     return task
@@ -128,7 +125,24 @@ def change_title(task_id: int, current_user: Annotated[models.DBUser, Depends(ge
     if task is None:
         raise HTTPException(status_code = 404, detail = "Task Not Found")
     else:
-        task.title = new_name
+        task.title = new_name # type: ignore
     
     db.commit()
     return task
+
+@app.put("/tasks/{task_id}/{priority_1}/change_priority", response_model = TaskResponse)
+def change_priority(task_id: int, current_user: Annotated[models.DBUser, Depends(get_current_active_user)], priority_1: str, db: Session = Depends(get_db)):
+    task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.user_id == current_user.id).first()
+
+    if task is None:
+        raise HTTPException(status_code = 404, detail = "Task Not Found")
+    else:
+        task.priority = Priority(priority_1) # type: ignore
+    db.commit()
+    return task
+
+@app.get("/tasks/high/priority/", response_model=list[TaskResponse])
+def High_priority(current_user: Annotated[models.DBUser, Depends(get_current_active_user)], db: Session = Depends(get_db)):
+    tasks = db.query(models.Task).filter(models.Task.user_id == current_user.id, models.Task.priority == Priority.H).all()
+    return tasks
+                  
