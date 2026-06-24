@@ -12,9 +12,7 @@ if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL environment variable is not set")
 
 engine = create_engine(DATABASE_URL)
-
-# Create tables
-models.Base.metadata.create_all(bind=engine)
+engine.dispose()
 
 sessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
