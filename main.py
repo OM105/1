@@ -1,11 +1,12 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from schema import TaskCreate, TaskResponse, UserRegister, UserResponse, TaskStatus, Priority
+from schema import *
 from database import get_db
 import models
 from typing import Annotated
 from auth import *
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import asc, desc
 
 
 
@@ -60,9 +61,27 @@ def root():
     return "Server is Running."
 
 @app.get("/tasks", response_model = list[TaskResponse])
-def get_tasks(current_user: Annotated[models.DBUser, Depends(get_current_active_user)], db:Session = Depends(get_db)):
-    tasks = db.query(models.Task).filter(models.Task.user_id == current_user.id).all()
+def get_tasks(status: str, priority: str, search: str, sort: str, current_user: Annotated[models.DBUser, Depends(get_current_active_user)], db:Session = Depends(get_db), limit: int = 10, offset: int = 0):
+    query = db.query(models.Task).filter(models.Task.user_id == current_user.id)
+
+    if status:
+        query = query.filter(models.Task.status == status)
+    
+    if priority:
+        query = query.filter(models.Task.priority == priority)
+    
+    if search:
+        query = query.filter(models.Task.title.ilike(f"%{search}%"))
+    
+    if sort.lower == "asc":
+        query = query.order_by(asc(models.Task.id))
+    else:
+        query = query.order_by(desc(models.Task.id))
+    
+    tasks = (query.limit(limit).offset(offset).all())
+
     return tasks
+
 
 @app.post("/tasks", response_model=TaskResponse)
 def create_task1(current_user: Annotated[models.DBUser, Depends(get_current_active_user)], task:TaskCreate, db:Session = Depends(get_db)):
@@ -105,44 +124,4 @@ def update_task(task_id:int, newdata:TaskCreate, current_user: Annotated[models.
     db.refresh(task)
     return task
 
-@app.get("/tasks/{task_id}/{s_u}/toggle", response_model = TaskResponse)
-def toggle(task_id:int, s_u: str, current_user: Annotated[models.DBUser, Depends(get_current_active_user)], db:Session = Depends(get_db)):
-    task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.user_id == current_user.id).first()
-
-    if task is None:
-        raise HTTPException(status_code = 404, detail = "Task Not Found")
-
-    task.status = TaskStatus(s_u) # type: ignore
-
-    
-    db.commit()
-    return task
-
-@app.put("/tasks/{task_id}/{new_name}/change_title", response_model = TaskResponse)
-def change_title(task_id: int, current_user: Annotated[models.DBUser, Depends(get_current_active_user)], new_name: str, db:Session = Depends(get_db)):
-    task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.user_id == current_user.id).first()
-
-    if task is None:
-        raise HTTPException(status_code = 404, detail = "Task Not Found")
-    else:
-        task.title = new_name # type: ignore
-    
-    db.commit()
-    return task
-
-@app.put("/tasks/{task_id}/{priority_1}/change_priority", response_model = TaskResponse)
-def change_priority(task_id: int, current_user: Annotated[models.DBUser, Depends(get_current_active_user)], priority_1: str, db: Session = Depends(get_db)):
-    task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.user_id == current_user.id).first()
-
-    if task is None:
-        raise HTTPException(status_code = 404, detail = "Task Not Found")
-    else:
-        task.priority = Priority(priority_1) # type: ignore
-    db.commit()
-    return task
-
-@app.get("/tasks/high/priority/", response_model=list[TaskResponse])
-def High_priority(current_user: Annotated[models.DBUser, Depends(get_current_active_user)], db: Session = Depends(get_db)):
-    tasks = db.query(models.Task).filter(models.Task.user_id == current_user.id, models.Task.priority == Priority.H).all()
-    return tasks
                   
